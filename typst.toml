@@ -1,0 +1,12 @@
+[package]
+name = "typst-oxide"
+version = "0.1.0"
+entrypoint = "lib.typ"
+authors = ["observerw"]
+license = "MIT"
+description = "PKM driven by typst"
+repository = "https://github.com/observerw/typst-oxide"
+keywords = ["PKM", "note"]
+categories = ["book"]
+exclude = ["examples"]
+compiler = "0.12.0"
