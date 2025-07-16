@@ -3,7 +3,6 @@
 #let wikilink-regex = regex("\[\[([^|\]]+?)(?::([^|\]]+?))?(?:\|([^\]]+))?\]\]")
 
 #let note(
-  font,
   body,
 ) = {
   set text(font: ("Source Han Sans SC", "Times New Roman"), size: 14pt, region: "cn")
@@ -25,6 +24,8 @@
       link(path)
     }
   }
+
+  set math.equation(numbering: "(1)")
 
   show heading.where(level: 1): it => {
     block[
