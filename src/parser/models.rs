@@ -1,0 +1,47 @@
+use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
+use std::path::PathBuf;
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct ParsedFile {
+    pub path: PathBuf,
+    pub metadata: Metadata,
+    pub wikilinks: Vec<Wikilink>,
+    pub labels: Vec<Label>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct Metadata {
+    pub title: Option<String>,
+    pub tags: Vec<String>,
+    pub alias: Vec<String>,
+    pub custom: HashMap<String, serde_json::Value>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct Wikilink {
+    pub target: String,
+    pub alias: Option<String>,
+    pub label: Option<String>,
+    pub line: usize,
+    pub column: usize,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct Label {
+    pub name: String,
+    pub line: usize,
+    pub column: usize,
+    pub is_implicit: bool, // true for headings, false for explicit <label>
+}
+
+impl Default for Metadata {
+    fn default() -> Self {
+        Self {
+            title: None,
+            tags: Vec::new(),
+            alias: Vec::new(),
+            custom: HashMap::new(),
+        }
+    }
+}

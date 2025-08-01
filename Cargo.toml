@@ -1,0 +1,19 @@
+[package]
+name = "typst-oxide"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+lsp-server = "0.7.8"
+lsp-types = { version = "0.97.0", features = ["proposed"] }
+rusqlite = { version = "0.37.0", features = ["bundled"] }
+serde = { version = "1.0.219", features = ["derive"] }
+serde_json = "1.0.142"
+tokio = { version = "1.47.0", features = ["fs", "rt", "process", "macros"] }
+ts-rs = "11.0.1"
+regex = "1.11.1"
+thiserror = "1.0.69"
+tera = "1.20.0"
+
+[dev-dependencies]
+tempfile = "3.10.0"
