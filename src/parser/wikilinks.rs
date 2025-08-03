@@ -1,19 +1,16 @@
 use crate::parser::models::Wikilink;
 use regex::Regex;
 use std::path::Path;
+use anyhow::Result;
 
-#[derive(Debug, thiserror::Error)]
-pub enum WikilinkError {
-    #[error("regex compilation failed")]
-    RegexError(#[from] regex::Error),
-}
+pub type WikilinkError = anyhow::Error;
 
 pub struct WikilinkParser {
     wikilink_regex: Regex,
 }
 
 impl WikilinkParser {
-    pub fn new() -> Result<Self, WikilinkError> {
+    pub fn new() -> Result<Self> {
         // Matches: [[target]], [[target|alias]], [[target:label]], [[target:label|alias]]
         let regex = Regex::new(r"\[\[([^|\]:\n]+)(?::([^|\]\n]+))?(?:\|([^|\]\n]+))?\]\]")?;
         

@@ -32,7 +32,6 @@ pub struct Label {
     pub name: String,
     pub line: usize,
     pub column: usize,
-    pub is_implicit: bool, // true for headings, false for explicit <label>
 }
 
 impl Default for Metadata {

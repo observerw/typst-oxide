@@ -1,38 +1,29 @@
 use crate::parser::models::{Label, ParsedFile, Wikilink};
+use anyhow::{Context, Result};
 use rusqlite::{Connection, OptionalExtension, params};
 use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 
-#[derive(Debug, thiserror::Error)]
-pub enum CacheError {
-    #[error("database error: {0}")]
-    DatabaseError(#[from] rusqlite::Error),
-    #[error("io error: {0}")]
-    IoError(#[from] std::io::Error),
-    #[error("path error: {0}")]
-    PathError(String),
-}
-
-pub struct Cache {
+pub struct Index {
     conn: Connection,
-    workspace_root: PathBuf,
+    root: PathBuf,
 }
 
-impl Cache {
-    pub fn new(workspace_root: &Path) -> Result<Self, CacheError> {
-        let db_path = workspace_root.join(".pkm-cache.db");
+impl Index {
+    pub fn new(root: &Path) -> Result<Self> {
+        let db_path = root.join(".pkm-cache.db");
         let conn = Connection::open(db_path)?;
 
-        let cache = Cache {
+        let cache = Index {
             conn,
-            workspace_root: workspace_root.to_path_buf(),
+            root: root.to_path_buf(),
         };
 
         cache.initialize_tables()?;
         Ok(cache)
     }
 
-    fn initialize_tables(&self) -> Result<(), CacheError> {
+    fn initialize_tables(&self) -> Result<()> {
         self.conn.execute(
             "CREATE TABLE IF NOT EXISTS files (
                 id INTEGER PRIMARY KEY,
@@ -116,7 +107,7 @@ impl Cache {
         Ok(())
     }
 
-    pub fn store_file(&mut self, file_path: &Path, parsed: &ParsedFile) -> Result<(), CacheError> {
+    pub fn store_file(&mut self, file_path: &Path, parsed: &ParsedFile) -> Result<()> {
         let relative_path = self.get_relative_path(file_path)?;
         let metadata = std::fs::metadata(file_path)?;
         let now = SystemTime::now()
@@ -131,9 +122,7 @@ impl Cache {
             "INSERT OR REPLACE INTO files (path, created_at, modified_at, last_parsed)
              VALUES (?, ?, ?, ?)",
             params![
-                relative_path
-                    .to_str()
-                    .ok_or_else(|| CacheError::PathError("Invalid UTF-8 in path".to_string()))?,
+                relative_path.to_str().context("Invalid UTF-8 in path")?,
                 metadata
                     .created()
                     .ok()
@@ -202,15 +191,9 @@ impl Cache {
         // Insert labels
         for label in &parsed.labels {
             tx.execute(
-                "INSERT INTO labels (file_id, name, line, column, is_implicit)
-                 VALUES (?, ?, ?, ?, ?)",
-                params![
-                    file_id,
-                    label.name,
-                    label.line as i64,
-                    label.column as i64,
-                    label.is_implicit
-                ],
+                "INSERT INTO labels (file_id, name, line, column)
+                 VALUES (?, ?, ?, ?)",
+                params![file_id, label.name, label.line as i64, label.column as i64],
             )?;
         }
 
@@ -218,16 +201,14 @@ impl Cache {
         Ok(())
     }
 
-    pub fn get_file(&self, file_path: &Path) -> Result<Option<ParsedFile>, CacheError> {
+    pub fn get_file(&self, file_path: &Path) -> Result<Option<ParsedFile>> {
         let relative_path = self.get_relative_path(file_path)?;
 
         let file_id: Option<i64> = self
             .conn
             .query_row(
                 "SELECT id FROM files WHERE path = ?",
-                [relative_path
-                    .to_str()
-                    .ok_or_else(|| CacheError::PathError("Invalid UTF-8 in path".to_string()))?],
+                [relative_path.to_str().context("Invalid UTF-8 in path")?],
                 |row| row.get(0),
             )
             .optional()?;
@@ -283,13 +264,12 @@ impl Cache {
         let mut labels = Vec::new();
         let mut stmt = self
             .conn
-            .prepare("SELECT name, line, column, is_implicit FROM labels WHERE file_id = ?")?;
+            .prepare("SELECT name, line, column FROM labels WHERE file_id = ?")?;
         let label_rows = stmt.query_map([file_id], |row| {
             Ok(Label {
                 name: row.get(0)?,
                 line: row.get::<_, i64>(1)? as usize,
                 column: row.get::<_, i64>(2)? as usize,
-                is_implicit: row.get(3)?,
             })
         })?;
 
@@ -305,14 +285,11 @@ impl Cache {
         }))
     }
 
-    pub fn get_backlinks(
-        &self,
-        target_file: &Path,
-    ) -> Result<Vec<(PathBuf, Wikilink)>, CacheError> {
+    pub fn get_backward_links(&self, target_file: &Path) -> Result<Vec<(PathBuf, Wikilink)>> {
         let target_name = target_file
             .file_stem()
             .and_then(|s| s.to_str())
-            .ok_or_else(|| CacheError::PathError("Invalid file name".to_string()))?;
+            .context("Invalid file name")?;
 
         let mut stmt = self.conn.prepare(
             "SELECT f.path, w.target, w.alias, w.label, w.line, w.column
@@ -323,7 +300,7 @@ impl Cache {
 
         let rows = stmt.query_map([target_name], |row| {
             let relative_path: String = row.get(0)?;
-            let full_path = self.workspace_root.join(relative_path);
+            let full_path = self.root.join(relative_path);
             let wikilink = Wikilink {
                 target: row.get(1)?,
                 alias: row.get(2)?,
@@ -342,16 +319,14 @@ impl Cache {
         Ok(backlinks)
     }
 
-    pub fn get_forward_links(&self, file_path: &Path) -> Result<Vec<Wikilink>, CacheError> {
+    pub fn get_forward_links(&self, file_path: &Path) -> Result<Vec<Wikilink>> {
         let relative_path = self.get_relative_path(file_path)?;
 
         let file_id: Option<i64> = self
             .conn
             .query_row(
                 "SELECT id FROM files WHERE path = ?",
-                [relative_path
-                    .to_str()
-                    .ok_or_else(|| CacheError::PathError("Invalid UTF-8 in path".to_string()))?],
+                [relative_path.to_str().context("Invalid UTF-8 in path")?],
                 |row| row.get(0),
             )
             .optional()?;
@@ -382,7 +357,7 @@ impl Cache {
         Ok(wikilinks)
     }
 
-    pub fn get_all_metadata(&self) -> Result<Vec<(String, String, String)>, CacheError> {
+    pub fn get_all_metadata(&self) -> Result<Vec<(String, String, String)>> {
         let mut stmt = self.conn.prepare(
             "SELECT f.path, m.key, m.value 
              FROM metadata m 
@@ -406,26 +381,22 @@ impl Cache {
         Ok(metadata)
     }
 
-    pub fn remove_file(&self, file_path: &Path) -> Result<(), CacheError> {
+    pub fn remove_file(&self, file_path: &Path) -> Result<()> {
         let relative_path = self.get_relative_path(file_path)?;
 
         self.conn.execute(
             "DELETE FROM files WHERE path = ?",
-            [relative_path
-                .to_str()
-                .ok_or_else(|| CacheError::PathError("Invalid UTF-8 in path".to_string()))?],
+            [relative_path.to_str().context("Invalid UTF-8 in path")?],
         )?;
 
         Ok(())
     }
 
-    fn get_relative_path(&self, file_path: &Path) -> Result<PathBuf, CacheError> {
+    fn get_relative_path(&self, file_path: &Path) -> Result<PathBuf> {
         file_path
-            .strip_prefix(&self.workspace_root)
+            .strip_prefix(&self.root)
             .map(|p| p.to_path_buf())
-            .map_err(|_| {
-                CacheError::PathError(format!("File {} is not in workspace", file_path.display()))
-            })
+            .with_context(|| format!("File {} is not in workspace", file_path.display()))
     }
 }
 
@@ -438,7 +409,7 @@ mod tests {
     #[test]
     fn test_cache_initialization() {
         let temp_dir = tempdir().unwrap();
-        let cache = Cache::new(temp_dir.path()).unwrap();
+        let cache = Index::new(temp_dir.path()).unwrap();
 
         // Should not panic
         drop(cache);
@@ -447,7 +418,7 @@ mod tests {
     #[test]
     fn test_store_and_retrieve_file() {
         let temp_dir = tempdir().unwrap();
-        let mut cache = Cache::new(temp_dir.path()).unwrap();
+        let mut cache = Index::new(temp_dir.path()).unwrap();
 
         let file_path = temp_dir.path().join("test.typ");
         std::fs::write(&file_path, "test content").unwrap();
@@ -471,7 +442,6 @@ mod tests {
                 name: "test-label".to_string(),
                 line: 2,
                 column: 5,
-                is_implicit: false,
             }],
         };
 
@@ -486,7 +456,7 @@ mod tests {
     #[test]
     fn test_backlinks() {
         let temp_dir = tempdir().unwrap();
-        let mut cache = Cache::new(temp_dir.path()).unwrap();
+        let mut cache = Index::new(temp_dir.path()).unwrap();
 
         let file1_path = temp_dir.path().join("file1.typ");
         let file2_path = temp_dir.path().join("file2.typ");
@@ -517,7 +487,7 @@ mod tests {
         cache.store_file(&file1_path, &parsed1).unwrap();
         cache.store_file(&file2_path, &parsed2).unwrap();
 
-        let backlinks = cache.get_backlinks(&file2_path).unwrap();
+        let backlinks = cache.get_backward_links(&file2_path).unwrap();
         assert_eq!(backlinks.len(), 1);
         assert_eq!(backlinks[0].1.target, "file2");
     }
@@ -525,7 +495,7 @@ mod tests {
     #[test]
     fn test_remove_file() {
         let temp_dir = tempdir().unwrap();
-        let mut cache = Cache::new(temp_dir.path()).unwrap();
+        let mut cache = Index::new(temp_dir.path()).unwrap();
 
         let file_path = temp_dir.path().join("test.typ");
         std::fs::write(&file_path, "test content").unwrap();

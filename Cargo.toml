@@ -12,8 +12,10 @@ serde_json = "1.0.142"
 tokio = { version = "1.47.0", features = ["fs", "rt", "process", "macros"] }
 ts-rs = "11.0.1"
 regex = "1.11.1"
-thiserror = "1.0.69"
 tera = "1.20.0"
+ropey = "1.6.1"
+anyhow = "1.0.98"
+rustc-hash = "2.1.1"
 
 [dev-dependencies]
 tempfile = "3.10.0"

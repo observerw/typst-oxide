@@ -1,3 +1,3 @@
-pub mod parser;
-pub mod cache;
 pub mod command;
+pub mod index;
+pub mod parser;
