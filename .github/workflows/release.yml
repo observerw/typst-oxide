@@ -1,0 +1,88 @@
+name: Release to crates.io
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to release (e.g., 0.1.0)'
+        required: true
+        type: string
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  release:
+    name: Release to crates.io
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Install Rust
+      uses: dtolnay/rust-toolchain@stable
+      with:
+        toolchain: stable
+        
+    - name: Cache cargo registry
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.cargo/registry
+          ~/.cargo/git
+          target
+        key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+        restore-keys: |
+          ${{ runner.os }}-cargo-
+          
+    - name: Check if version matches tag
+      if: github.event_name == 'push'
+      run: |
+        TAG_VERSION=${GITHUB_REF#refs/tags/v}
+        CARGO_VERSION=$(grep '^version = ' Cargo.toml | sed 's/version = "\(.*\)"/\1/')
+        if [ "$TAG_VERSION" != "$CARGO_VERSION" ]; then
+          echo "Tag version ($TAG_VERSION) does not match Cargo.toml version ($CARGO_VERSION)"
+          exit 1
+        fi
+        
+    - name: Update version for manual dispatch
+      if: github.event_name == 'workflow_dispatch'
+      run: |
+        sed -i 's/^version = ".*"/version = "${{ github.event.inputs.version }}"/' Cargo.toml
+        
+    - name: Run tests
+      run: cargo test --verbose
+      
+    - name: Check formatting
+      run: cargo fmt --all -- --check
+      
+    - name: Run clippy
+      run: cargo clippy --all-targets --all-features -- -D warnings
+      
+    - name: Build release
+      run: cargo build --release --verbose
+      
+    - name: Publish to crates.io
+      env:
+        CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+      run: cargo publish --verbose
+      
+    - name: Create GitHub Release
+      if: github.event_name == 'push'
+      uses: softprops/action-gh-release@v1
+      with:
+        tag_name: ${{ github.ref_name }}
+        name: Release ${{ github.ref_name }}
+        body: |
+          Release ${{ github.ref_name }} of typst-oxide
+          
+          ## Changes
+          See [CHANGELOG.md](CHANGELOG.md) for details.
+        draft: false
+        prerelease: false
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -1,7 +1,7 @@
 use crate::parser::models::Wikilink;
+use anyhow::Result;
 use regex::Regex;
 use std::path::Path;
-use anyhow::Result;
 
 pub type WikilinkError = anyhow::Error;
 
@@ -13,16 +13,13 @@ impl WikilinkParser {
     pub fn new() -> Result<Self> {
         // Matches: [[target]], [[target|alias]], [[target:label]], [[target:label|alias]]
         let regex = Regex::new(r"\[\[([^|\]:\n]+)(?::([^|\]\n]+))?(?:\|([^|\]\n]+))?\]\]")?;
-        
+
         Ok(Self {
             wikilink_regex: regex,
         })
     }
 
-    pub fn parse_wikilinks(&self,
-        content: &str,
-        file_path: &Path,
-    ) -> Vec<Wikilink> {
+    pub fn parse_wikilinks(&self, content: &str, file_path: &Path) -> Vec<Wikilink> {
         let mut wikilinks = Vec::new();
         let lines: Vec<&str> = content.lines().collect();
 
@@ -59,9 +56,9 @@ mod tests {
         let parser = WikilinkParser::new().unwrap();
         let content = "This is a [[simple]] wikilink.";
         let path = PathBuf::from("test.typ");
-        
+
         let wikilinks = parser.parse_wikilinks(content, &path);
-        
+
         assert_eq!(wikilinks.len(), 1);
         assert_eq!(wikilinks[0].target, "simple");
         assert_eq!(wikilinks[0].alias, None);
@@ -75,9 +72,9 @@ mod tests {
         let parser = WikilinkParser::new().unwrap();
         let content = "Link to [[target|alias name]].";
         let path = PathBuf::from("test.typ");
-        
+
         let wikilinks = parser.parse_wikilinks(content, &path);
-        
+
         assert_eq!(wikilinks.len(), 1);
         assert_eq!(wikilinks[0].target, "target");
         assert_eq!(wikilinks[0].alias, Some("alias name".to_string()));
@@ -89,9 +86,9 @@ mod tests {
         let parser = WikilinkParser::new().unwrap();
         let content = "Link to [[file:section]].";
         let path = PathBuf::from("test.typ");
-        
+
         let wikilinks = parser.parse_wikilinks(content, &path);
-        
+
         assert_eq!(wikilinks.len(), 1);
         assert_eq!(wikilinks[0].target, "file");
         assert_eq!(wikilinks[0].alias, None);
@@ -103,9 +100,9 @@ mod tests {
         let parser = WikilinkParser::new().unwrap();
         let content = "Link to [[file:section|Section 1]].";
         let path = PathBuf::from("test.typ");
-        
+
         let wikilinks = parser.parse_wikilinks(content, &path);
-        
+
         assert_eq!(wikilinks.len(), 1);
         assert_eq!(wikilinks[0].target, "file");
         assert_eq!(wikilinks[0].alias, Some("Section 1".to_string()));
@@ -117,9 +114,9 @@ mod tests {
         let parser = WikilinkParser::new().unwrap();
         let content = "First [[link1]] and second [[link2|alias]].";
         let path = PathBuf::from("test.typ");
-        
+
         let wikilinks = parser.parse_wikilinks(content, &path);
-        
+
         assert_eq!(wikilinks.len(), 2);
         assert_eq!(wikilinks[0].target, "link1");
         assert_eq!(wikilinks[1].target, "link2");
@@ -130,9 +127,9 @@ mod tests {
         let parser = WikilinkParser::new().unwrap();
         let content = "First line\n[[line2]] on second line\n[[line3|alias]] on third";
         let path = PathBuf::from("test.typ");
-        
+
         let wikilinks = parser.parse_wikilinks(content, &path);
-        
+
         assert_eq!(wikilinks.len(), 2);
         assert_eq!(wikilinks[0].target, "line2");
         assert_eq!(wikilinks[0].line, 2);
@@ -145,9 +142,9 @@ mod tests {
         let parser = WikilinkParser::new().unwrap();
         let content = "See [[document.pdf]] for details.";
         let path = PathBuf::from("test.typ");
-        
+
         let wikilinks = parser.parse_wikilinks(content, &path);
-        
+
         assert_eq!(wikilinks.len(), 1);
         assert_eq!(wikilinks[0].target, "document.pdf");
     }

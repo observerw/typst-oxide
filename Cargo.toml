@@ -2,6 +2,16 @@
 name = "typst-oxide"
 version = "0.1.0"
 edition = "2024"
+authors = ["observerw <wozluohd@gmail.com>"]
+description = "A language server for Personal Knowledge Management (PKM) systems using Typst as the markup language"
+license = "MIT"
+repository = "https://github.com/observerw/typst-oxide"
+homepage = "https://github.com/observerw/typst-oxide"
+documentation = "https://docs.rs/typst-oxide"
+readme = "README.md"
+keywords = ["lsp", "typst", "pkm", "language-server", "knowledge-management"]
+categories = ["development-tools", "text-processing"]
+exclude = [".github/*", "*.md", "tests/*"]
 
 [dependencies]
 lsp-server = "0.7.8"
