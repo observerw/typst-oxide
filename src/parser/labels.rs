@@ -4,7 +4,6 @@ use regex::Regex;
 
 pub struct LabelParser {
     label_regex: Regex,
-    heading_regex: Regex,
 }
 
 impl LabelParser {
@@ -12,12 +11,8 @@ impl LabelParser {
         // Matches explicit labels: <label-name>
         let explicit_label_regex = Regex::new(r"<([a-zA-Z0-9_:.-]+)>")?;
 
-        // Matches headings: = Heading, == Subsection, etc.
-        let heading_regex = Regex::new(r"^(=+)\s+(.+)$")?;
-
         Ok(Self {
             label_regex: explicit_label_regex,
-            heading_regex,
         })
     }
 
@@ -39,36 +34,7 @@ impl LabelParser {
                 });
             }
 
-            // Parse headings as implicit labels
-            if let Some(cap) = self.heading_regex.captures(line) {
-                let heading_text = cap.get(2).unwrap().as_str().trim();
-                if !heading_text.is_empty() {
-                    // Convert heading to label format: lowercase, replace spaces with hyphens
-                    let label_name = heading_text
-                        .to_lowercase()
-                        .chars()
-                        .map(|c| {
-                            if c.is_alphanumeric() || c == '-' || c == '_' {
-                                c
-                            } else {
-                                '-'
-                            }
-                        })
-                        .collect::<String>()
-                        .split('-')
-                        .filter(|s| !s.is_empty())
-                        .collect::<Vec<_>>()
-                        .join("-");
 
-                    if !label_name.is_empty() {
-                        labels.push(Label {
-                            name: label_name,
-                            line: line_idx + 1,
-                            column: 1,
-                        });
-                    }
-                }
-            }
         }
 
         labels
