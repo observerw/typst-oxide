@@ -67,7 +67,6 @@ impl Index {
                 name TEXT NOT NULL,
                 line INTEGER,
                 column INTEGER,
-                is_implicit BOOLEAN,
                 FOREIGN KEY (file_id) REFERENCES files(id)
             )",
             [],

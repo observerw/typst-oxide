@@ -2,12 +2,12 @@ use lsp_server::Request as ServerRequest;
 use lsp_server::{Connection, ErrorCode, Message, RequestId, Response};
 
 pub mod command;
+pub mod index;
 pub mod parser;
 
 use anyhow::Result;
 use lsp_types::ServerCapabilities;
 use lsp_types::request::{GotoDefinition, Request};
-use rustc_hash::FxHashMap;
 
 struct Context {}
 
